@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# macOS
+.DS_Store
+
+# Pipeline outputs / runtime
+out/
+pravachan-output/
+*.log
+
+# Local secrets / env
+.env
+*.key
+service-account*.json

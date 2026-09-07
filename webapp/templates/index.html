@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pravachan Pipeline</title>
+<style>
+:root{--bg:#0f1220;--panel:#171a2b;--ink:#e7e9f3;--muted:#a3a8c3;--line:#2a2f4a;--accent:#7aa2ff;--ok:#37d67a;--run:#ffb23a;--err:#ff6b6b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:28px 20px 80px}
+h1{font-size:24px;margin:0 0 2px}.sub{color:var(--muted);margin:0 0 22px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:22px}
+label{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.04em}
+input,select{width:100%;background:#0b0e1a;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:9px 11px;font-size:14px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+button{background:var(--accent);color:#08122e;border:0;border-radius:9px;padding:11px 18px;font-weight:700;font-size:14px;cursor:pointer;margin-top:16px}
+button:hover{filter:brightness(1.08)}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+.s-done{background:rgba(55,214,122,.15);color:var(--ok)}.s-running{background:rgba(255,178,58,.15);color:var(--run)}
+.s-queued{background:#20243c;color:var(--muted)}.s-error{background:rgba(255,107,107,.15);color:var(--err)}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+.warn{background:rgba(255,107,107,.12);border:1px solid var(--err);color:#ffd0d0;padding:10px 13px;border-radius:9px;margin-bottom:18px;font-size:13.5px}
+.mut{color:var(--muted);font-size:13px}details{margin-top:6px}pre{white-space:pre-wrap;background:#0b0e1a;border:1px solid var(--line);border-radius:8px;padding:10px;max-height:280px;overflow:auto;font-size:12px}
+.dl a{margin-right:10px}
+</style></head><body>
+<div class="wrap">
+  <h1>Pravachan Pipeline</h1>
+  <p class="sub">Drive / YouTube / upload → transcript → multi-agent Claude typeset → PDF + DOCX. Runs on this machine, on your own Claude key.</p>
+
+  {% if not has_key %}<div class="warn">⚠️ <b>ANTHROPIC_API_KEY is not set</b> in this server's environment — the typeset (build) stage will fail. Set it and restart, or run <code>ant auth login</code>.</div>{% endif %}
+  {% if not nlm_ready %}<div class="warn">⚠️ <b>NotebookLM not logged in yet.</b> Transcription uses NotebookLM in a dedicated Firefox profile. Run <code>pravachan-nlm-login</code> once on this machine and sign in, then jobs can transcribe. (profile: <code>{{nlm_profile}}</code>)</div>{% endif %}
+
+  <div class="card">
+    <form method="post" action="/jobs" enctype="multipart/form-data">
+      <div class="row">
+        <div><label>Set name (output folder)</label><input name="set_name" placeholder="e.g. anjar_paryushan" required></div>
+        <div><label>Title style</label><select name="title_style">
+          {% for t in title_styles %}<option value="{{t}}" {% if t=='topic' %}selected{% endif %}>{{t}}</option>{% endfor %}
+        </select></div>
+      </div>
+      <label>Source — Google Drive folder URL, YouTube video/playlist URL (or upload below)</label>
+      <input name="source" placeholder="https://drive.google.com/drive/folders/…  or  https://youtube.com/…">
+      <div class="row3">
+        <div><label>Source type</label><select name="source_type">
+          <option value="auto" selected>auto</option><option value="drive">drive</option>
+          <option value="youtube">youtube</option><option value="local">local</option></select></div>
+        <div><label>Or upload an audio file</label><input type="file" name="upload" accept="audio/*,video/mp4,.m4a,.mp3"></div>
+        <div><label>Format</label><select name="fmt"><option value="both" selected>PDF + DOCX</option><option value="pdf">PDF</option><option value="docx">DOCX</option></select></div>
+      </div>
+      <div class="row3">
+        <div><label>Transcriber</label><select name="transcriber">
+          <option value="notebooklm" selected>NotebookLM (Selenium)</option>
+          <option value="google">Google Cloud STT (fallback)</option></select></div>
+        <div><label>Columns</label><select name="columns"><option>2</option><option>1</option><option>3</option></select></div>
+        <div><label>Font size</label><input name="size" value="18"></div>
+      </div>
+      <div class="row">
+        <div><label>Build workers (parallel Claude agents)</label><input name="workers" value="4"></div>
+        <div><label>Claude model</label><input name="model" value="claude-opus-5"></div>
+      </div>
+      <button type="submit">Queue job ▸</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <table><thead><tr><th>#</th><th>Set</th><th>Source</th><th>Title</th><th>Status</th><th>Outputs</th></tr></thead>
+      <tbody id="rows">
+      {% for j in jobs %}
+        <tr id="job-{{j.id}}"><td>{{j.id}}</td><td>{{j.set_name}}</td><td class="mut">{{j.source_type}}</td>
+          <td class="mut">{{j.title_style}}</td>
+          <td><span class="badge s-{{j.status}}">{{j.status}}{% if j.stage and j.status=='running' %} · {{j.stage}}{% endif %}</span></td>
+          <td class="dl"><a href="/zip/{{j.id}}">zip</a><a href="#" onclick="showlog({{j.id}});return false">log</a></td></tr>
+      {% endfor %}
+      </tbody></table>
+    <div id="logbox"></div>
+  </div>
+</div>
+<script>
+async function refresh(){
+  try{const r=await fetch('/api/jobs');const js=await r.json();
+    for(const j of js){const row=document.getElementById('job-'+j.id);if(!row)continue;
+      const b=row.querySelector('.badge');b.className='badge s-'+j.status;
+      b.textContent=j.status+(j.status==='running'&&j.stage?(' · '+j.stage):'');
+      const dl=row.querySelector('.dl');
+      dl.innerHTML='<a href="/zip/'+j.id+'">zip ('+j.pdfs+'pdf/'+j.docx+'docx)</a>'+
+                   '<a href="#" onclick="showlog('+j.id+');return false">log</a>';}
+  }catch(e){}
+}
+async function showlog(id){const r=await fetch('/api/jobs/'+id+'/log');
+  document.getElementById('logbox').innerHTML='<h4 class="mut">job '+id+' log</h4>'+await r.text();}
+setInterval(refresh,3000);refresh();
+</script>
+</body></html>

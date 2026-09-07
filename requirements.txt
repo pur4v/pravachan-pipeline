@@ -1,0 +1,24 @@
+# Stage 1 — fetch
+gdown>=5.0              # Google Drive folders
+yt-dlp>=2024.1          # YouTube video/playlist → mp3 (needs ffmpeg on PATH)
+
+# Stage 2 — transcription
+#   PRIMARY: NotebookLM via Selenium (needs Firefox + geckodriver; one-time login).
+selenium>=4.18
+#   OPTIONAL fallback: Google Cloud Speech-to-Text (install the `google` extra):
+#   pip install "google-cloud-speech>=2.21" "google-cloud-storage>=2.14"
+#   (needs GOOGLE_APPLICATION_CREDENTIALS + PRAVACHAN_GCS_BUCKET). No Whisper.
+
+# Stage 3 — skill (Claude API) + typesetting
+anthropic>=1.0
+weasyprint>=60          # PDF; needs pango/cairo (brew install pango)
+python-docx>=1.0
+beautifulsoup4>=4.12
+# Gujarati fonts for the PDF:
+#   brew install --cask font-noto-serif-gujarati font-noto-sans-gujarati
+
+# Web app (pravachan-web)
+fastapi>=0.110
+uvicorn>=0.27
+jinja2>=3.1
+python-multipart>=0.0.9
