@@ -1,6 +1,6 @@
 ---
 name: jain-pravachan-transcript
-description: Turn raw Gujarati (or Hindi) Jain pravachan / vyakhyan speech-to-text transcripts into clean, readable, sectioned documents and typeset them as PDF or DOCX. Use this whenever the user supplies a discourse transcript — Kalpasutra, Agam or Payanna vachana, Paryushan lectures, katha, or any recorded sermon — and asks to "convert to readable paragraphs", "clean this up", "make it a PDF/doc", or "format this". Also use it when they ask for magazine-style two-column layouts, landscape output, or larger font sizes for Gujarati religious material, and when they ask to fix garbled ASR spellings of Jain technical terms.
+description: Turn raw Gujarati (or Hindi) Jain pravachan / vyakhyan speech-to-text transcripts into clean, readable, sectioned documents and typeset them as a print-ready A5 book (PDF + DOCX). Use this whenever the user supplies a discourse transcript — Kalpasutra, Agam or Payanna vachana, Paryushan lectures, katha, or any recorded sermon — and asks to "convert to readable paragraphs", "clean this up", "make it a PDF/doc", "make an A5 book", or "format this". The default output is an A5 print book with an index, a સારાંશ summary and a વિચારનકશો mindmap. Also use it when they ask for magazine-style two-column layouts, landscape output, or larger font sizes for Gujarati religious material, and when they ask to fix garbled ASR spellings of Jain technical terms.
 ---
 
 # Jain Pravachan Transcript → Readable Document
@@ -66,15 +66,15 @@ headings were added for readability — the reader should know the shaping is ed
 
 ## Stage 3: Typeset
 
-Write the structured content as an HTML fragment, then run the build script.
+Write the structured content as an HTML fragment, then run the build script. **The
+default output is a print-ready A5 book** — see "A5 book format" below for the full
+layout spec. The old magazine layout is still available with `--layout magazine`.
 
 The fragment uses only these elements — the script styles them all:
 
 ```html
-<h1>શીર્ષક</h1>
-<p class="sub">ઉપશીર્ષક</p>
-<p class="note">(સંપાદકીય નોંધ)</p>
-<h2>૧. વિભાગનું નામ</h2>
+<h1>વિષયનું નામ</h1>                         <!-- the topic; the number is added -->
+<h2>૧. વિભાગનું નામ</h2>                       <!-- numbered section heading -->
 <p>સામાન્ય ફકરો</p>
 <p class="q"><b>પ્રશ્ન:</b> શ્રોતાનો પ્રશ્ન</p>
 <div class="verse">ગાથા<br>બીજી પંક્તિ</div>
@@ -82,68 +82,119 @@ The fragment uses only these elements — the script styles them all:
 <p class="end">॥ મિચ્છા મિ દુક્કડમ્ ॥</p>
 ```
 
+In A5 the book prints only the **"number. topic"** title — never a subtitle, date line
+or transcription note — so `p.sub` / `p.note` are ignored. Then author two more parts
+**from the talk itself** (see "Authoring સારાંશ and વિચારનકશો"):
+
+```html
+<div class="summary">
+  <p>…</p> <p>…</p>   <!-- ~5 paragraphs following the talk's arc -->
+  <div class="stats"><p><b>એક નજરે મુખ્ય આંકડા</b><br>
+      figure<br>figure<br>figure</p></div>
+</div>
+<div class="mindmap">
+  <div class="branch" data-range="વિભાગ ૧–૩">થીમનું નામ
+    <div class="leaf" data-sec="૧">એક પંક્તિ</div>
+    <div class="leaf" data-sec="૨">એક પંક્તિ</div>
+    <div class="leaf" data-sec="૩">એક પંક્તિ</div>
+  </div>
+  <!-- exactly 5 branches, 3 leaves each, covering every section -->
+</div>
+```
+
 Then build:
 
 ```bash
-python3 scripts/build_doc.py content.html --out NAME
+python3 scripts/build_doc.py content.html --out NAME --number 17
 ```
-
-The defaults are the approved house layout — **A4 landscape, two equal columns,
-18pt** — so most of the time no flags are needed. Override only when asked.
 
 Flags:
 
 | flag | default | notes |
 |---|---|---|
-| `--format` | `both` | `pdf`, `docx`, or `both` |
-| `--size` | `18` | body point size |
-| `--columns` | `2` | the 50/50 magazine split. See "Choosing the layout" below |
-| `--portrait` | off | A4 vertical; landscape is the default |
 | `--out` | required | base filename, no extension |
+| `--format` | `both` | `pdf`, `docx`, or `both` |
+| `--layout` | `a5` | `a5` print book (default) or `magazine` (old A4) |
+| `--number` | — | A5: the vyakhyan number for the title |
+| `--src-name` | — | A5: original filename; the leading digits become the number |
+| `--size` / `--columns` / `--portrait` | 18 / 2 / off | **magazine layout only** |
 
-Run `scripts/setup.sh` once first — it installs the Gujarati fonts and the two Python
-libraries. Without `fonts-noto-*` the Gujarati renders as empty boxes.
+The number is the leading digits of the source file name
+(`9_સમાધિ શતક_23_7_24.docx` → ૯), written in Gujarati numerals. Pass it with
+`--number`, or pass `--src-name` and let the script derive it. **If the file name has
+no leading number, stop and ask the user for it** — don't guess.
 
-## Choosing the layout
+Run `scripts/setup.sh` once first — it installs the Gujarati fonts and Python
+libraries. No other tools are needed: the index page numbers for **both** the PDF and
+the DOCX are read directly from the WeasyPrint layout (the same layout that produces
+the PDF), so the DOCX index numbers match the print master and require no LibreOffice
+or Word round-trip.
 
-**Two columns is the default choice for anything long.** A pravachan runs 3,000–6,000
-words. Set full width at a readable point size, the lines get so long the eye loses
-its place returning to the next one. Splitting the page 50/50 halves the line length
-and the document reads like a magazine or a patrika instead of a wall of text.
+## A5 book format
 
-The script handles this automatically:
+This is the default and the approved format. `build_doc.py` implements all of it; the
+rules below are the contract.
 
-- The two columns are **equal width**, with a 9mm gutter and a thin vertical rule
-  between them.
-- The **masthead spans the full page width** above the columns — title, subtitle,
-  editorial note, then a double rule. Text flows into the columns only below that.
-  (In DOCX this is done with a continuous section break, which is what makes the
-  columns survive the conversion into Google Docs.)
-- Headings sit inside the column flow and never strand at the foot of one.
-- Verse blocks and boxes never split across a column break.
+**Content.** Never remove, shorten or reword the vyakhyan text. The script verifies the
+DOCX body is character-for-character identical to the source (whitespace-stripped) and
+reports PASS/FAIL — do not verify via PDF text extraction, because Gujarati pre-base
+matras like િ extract out of order and give false alarms.
 
-Picking the numbers:
+**Output.** Always produce both PDF (print master, WeasyPrint — it shapes Gujarati
+conjuncts and supports `target-counter()` for index numbers) and DOCX.
 
-| situation | flags |
-|---|---|
-| **standard reading copy** (the approved house layout) | none — defaults do it |
-| wants to print and bind vertically | `--portrait` |
-| wants more on each page at large type | `--columns 3` |
-| short handout, or a plain single flow | `--portrait --columns 1 --size 14` |
+**Page & type.** A5 portrait, single column. Body: Noto Serif Gujarati **14pt fixed**,
+line-height 1.35, justified — never drop below 14pt to save pages. Section headings
+15pt; index 13pt; સારાંશ 13pt; stats boxes and verses 13pt. Title, headings and mindmap
+use Noto Sans Gujarati Bold. Mirrored binding margins: inner 14mm, outer 9mm, top 10mm,
+bottom 10mm. Page number on the outer bottom corner (right on odd, left on even).
+Running head — the "number. topic" title, 7.5pt grey #9a8a7a, centred — on every page
+except page 1.
 
-**Watch the interaction between size and column width.** Landscape A4 with two columns
-gives roughly 13cm per column — comfortable at 18–22pt. Switching to `--portrait`
-narrows that to about 85mm, which is about 25 Gujarati characters per line at 18pt:
-still readable, but push past 22pt there and lines start breaking mid-compound. At
-that point go back to landscape or drop to one column.
+**Structure, in order:** (1) page 1: title (centred 20pt brown #7A2E00, thin beige rule)
+then the અનુક્રમણિકા directly beneath — no separate title page; (2) index: every section
+heading with dot leaders and real computed page numbers, plus સારાંશ and વિચારનકશો as
+the last two entries; (3) body starts directly under the index, same page, no break;
+(4) સારાંશ on a fresh page after the body; (5) વિચારનકશો always the last page, fits on
+one page. Never insert blank pages.
 
-**Landscape does not automatically mean fewer pages.** Two wide columns hold roughly
-what two narrow portrait columns hold, so the page count barely moves. If the point is
-genuinely fitting more on each sheet, use `--columns 3`.
+**Spacing.** Paragraph gap 3pt. Headings 4mm above / 1.5mm below, brown-gold #D9A066
+left bar, kept with next. Stats/figure boxes and verses are tight (each figure on its
+own line, no gap; collapse `<br><br>` to `<br>`; never split across pages). Q/listener
+lines: italic, small indent, bold brown label.
 
-If the user says nothing about layout, just build the default — it is the layout they
-already approved. Ask only when they signal something unusual (printing, binding,
-projecting, a reader with poor eyesight).
+**Mindmap.** Dark-brown #7A2E00 banner with "number. topic" (white bold 12pt) and
+વિચારનકશો (8.5pt). 5 theme branches, each a full-width colour bar (theme white bold
+10.5pt left, "વિભાગ ૧–૩" range 7.5pt right). Under each: 3 white leaf boxes with beige
+#DDD0C0 border on a 1.2mm coloured spine; each leaf a bold section-number chip + one
+line 9pt. Group sections into themes by meaning; 5×3 leaves must cover every section (a
+chip may span two, e.g. "૧૫–૧૬"). Branch colours in order: #8C3B12, #1F5673, #7A5C1E,
+#3F6B4A, #8A2E5B. Footer: "રંગીન અંક = વ્યાખ્યાનના વિભાગનો ક્રમાંક."
+
+**Delivery.** Name outputs `<NN>_<topic-in-latin>_<date>_A5_book.pdf/.docx`. Report the
+page count for both files, which pages સારાંશ and વિચારનકશો land on, and the
+text-integrity result. To cut pages, tighten box air / paragraph / heading spacing —
+never the text, never below 14pt. Tell the printer: A5 at 100%, no scaling.
+
+## Authoring સારાંશ and વિચારનકશો
+
+These two parts are written by you, from the talk — the script only lays them out.
+
+- **સારાંશ**: about 5 paragraphs following the talk's arc, drawn from the talk itself
+  (not invented), plus an "એક નજરે મુખ્ય આંકડા" box of the key figures actually
+  mentioned (counts, measures, years, amounts).
+- **વિચારનકશો**: group the numbered sections into 5 themes *by meaning*, not by order.
+  Each theme gets 3 leaves; every section must be covered. Keep each leaf to one short
+  line so it stays on a single line in the box.
+
+## Magazine layout (`--layout magazine`)
+
+The older A4 layout is preserved for when the user explicitly wants a magazine/patrika
+look: `--layout magazine` with `--columns` (default 2, equal width, 9mm gutter, thin
+rule), `--size` (default 18), and `--portrait` (default is landscape). The masthead
+(title/subtitle/note + double rule) spans the full width above the columns; in DOCX
+this uses a continuous section break so the columns survive conversion to Google Docs.
+Use it only when asked — otherwise build the A5 book.
 
 ## Things that will bite you
 
@@ -167,10 +218,11 @@ material comes in long series and it is tempting to batch — don't, unless aske
 
 After building, tell the user in a few lines:
 
-1. Page count and layout.
-2. The significant term corrections you made (`ASR spelling → correct spelling`),
+1. Page count for both files, and which pages the સારાંશ and વિચારનકશો land on.
+2. The text-integrity result the script reports (PASS/FAIL).
+3. The significant term corrections you made (`ASR spelling → correct spelling`),
    grouped, not exhaustive — the notable ones.
-3. Anything you dropped, guessed at, or think needs a human eye: garbled proper nouns,
+4. Anything you dropped, guessed at, or think needs a human eye: garbled proper nouns,
    suspect numbers, gathas you reconstructed loosely. Be specific about which passage.
 
 That third point matters most. The user usually knows this material far better than
